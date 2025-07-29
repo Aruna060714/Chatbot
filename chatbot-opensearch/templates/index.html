@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>TinyTalk AI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    html, body { height: 100%; }
+    #chatbox::-webkit-scrollbar { width: 6px; }
+    #chatbox::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
+  </style>
+</head>
+<body class="bg-[#f7f7f8] text-gray-900 flex flex-col h-full font-sans">
+  <header class="py-6 text-center border-b border-gray-200 bg-white shadow-sm">
+    <h1 class="text-3xl font-bold text-indigo-600">🧠 TinyTalk AI</h1>
+    <p class="text-gray-500 mt-1">Ask anything about our products</p>
+  </header>
+  <main class="flex-1 overflow-y-auto px-4 py-6" id="chatbox">
+  </main>
+  <footer class="bg-white border-t border-gray-300 px-4 py-3 sticky bottom-0">
+    <div class="max-w-3xl mx-auto flex gap-2">
+      <input
+        id="message"
+        class="flex-1 p-3 rounded-md border border-gray-300 bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        placeholder="Type your message..."
+      />
+      <button
+        onclick="sendMessage()"
+        class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-5 py-2 rounded-md transition"
+      >
+        Send
+      </button>
+    </div>
+  </footer>
+  <script>
+    const chatbox = document.getElementById("chatbox");
+    function formatTime() {
+      const now = new Date();
+      return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    function appendMessage(sender, text, isTyping = false) {
+      const wrapper = document.createElement("div");
+      const avatar = document.createElement("img");
+      const contentWrapper = document.createElement("div");
+      const meta = document.createElement("div");
+      const bubble = document.createElement("div");
+      avatar.className = "w-8 h-8 rounded-full mr-3";
+      avatar.src = sender === "AI"
+        ? "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/d5/81/c8/d581c8da-9a43-6513-f7a3-0dcc4928aa1f/AppIcon-0-0-1x_U007emarketing-0-7-0-85-220.png/512x512bb.jpg"
+        : "https://www.gravatar.com/avatar/?d=mp";
+      avatar.alt = sender;
+      wrapper.className = `mb-4 flex ${sender === "AI" ? "items-start" : "items-end justify-end"}`;
+      contentWrapper.className = "flex flex-col";
+      bubble.className = "px-4 py-3 rounded-lg shadow-sm inline-block max-w-2xl whitespace-pre-wrap break-words";
+      if (sender === "AI") {
+        bubble.classList.add("bg-gray-100", "text-gray-900");
+      } else {
+        bubble.classList.add("bg-green-100", "text-gray-900");
+      }
+      bubble.innerHTML = isTyping
+        ? `<em>Typing...</em>`
+        : `<strong>${sender}:</strong><br>${marked.parse(text)}`;
+      meta.className = "text-xs text-gray-500 mt-1";
+      meta.innerText = formatTime();
+      contentWrapper.appendChild(bubble);
+      contentWrapper.appendChild(meta);
+      if (sender === "AI") {
+        wrapper.appendChild(avatar);
+        wrapper.appendChild(contentWrapper);
+      } else {
+        wrapper.appendChild(contentWrapper);
+        wrapper.appendChild(avatar);
+      }
+      wrapper.id = isTyping ? "typing-indicator" : "";
+      chatbox.appendChild(wrapper);
+      chatbox.scrollTop = chatbox.scrollHeight;
+    }
+    async function sendMessage() {
+      const input = document.getElementById("message");
+      const message = input.value.trim();
+      if (!message) return;
+      appendMessage("You", message);
+      input.value = "";
+      appendMessage("AI", "", true); 
+      try {
+        const response = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message })
+        });
+        const data = await response.json();
+        const typingEl = document.getElementById("typing-indicator");
+        if (typingEl) typingEl.remove();
+        appendMessage("AI", data.reply || "Sorry, I didn’t understand.");
+      } catch (e) {
+        const typingEl = document.getElementById("typing-indicator");
+        if (typingEl) typingEl.remove();
+
+        appendMessage("AI", "⚠️ Error: Couldn't reach server.");
+      }
+    }
+    document.getElementById("message").addEventListener("keydown", function (event) {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        sendMessage();
+      }
+    });
+  </script>
+</body>
+</html>
